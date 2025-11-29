@@ -26,7 +26,7 @@
         
         <div class="bg-gray-700 p-4 text-center border-b-4 border-gray-600">
             <h1 class="mc-font text-green-400 text-xl md:text-2xl shadow-black drop-shadow-md">RIFQY MC</h1>
-            <p class="text-xs text-gray-400 mt-2">Powered by mcsrvstat.us & mcstatus.io</p>
+            <p class="text-xs text-gray-400 mt-2">Server Status Checker</p>
         </div>
 
         <div class="p-6 space-y-4">
@@ -41,9 +41,9 @@
             </div>
 
             <div>
-                <label class="text-xs uppercase text-gray-400 font-bold ml-1">Server IP</label>
+                <label class="text-xs uppercase text-gray-400 font-bold ml-1">Masukkan Server IP dan PORT</label>
                 <div class="flex mt-1">
-                    <input type="text" id="serverInput" placeholder="IP:Port (cth: NationMC.net:19132)" 
+                    <input type="text" id="serverInput" placeholder="cth: play.hypixel.net / 1.1.1.1:19132" 
                         class="w-full bg-gray-900 border-2 border-gray-500 p-3 text-white focus:outline-none focus:border-green-500 font-mono rounded-l">
                     <button onclick="checkStatus()" class="bg-green-600 px-4 rounded-r hover:bg-green-500 transition border-2 border-l-0 border-green-700">
                         <i class="fas fa-search"></i>
@@ -59,36 +59,50 @@
             <div id="errorBox" class="hidden bg-red-900/80 border border-red-500 p-3 rounded text-center text-sm text-red-200"></div>
 
             <div id="resultBox" class="hidden bg-gray-900/50 rounded-lg border border-gray-600 p-4 animate-fade-in">
-                <div class="flex items-start gap-4">
-                    <img id="srvIcon" src="" class="w-16 h-16 rounded pixelated bg-gray-800" alt="Icon">
+                
+                <div class="flex items-center gap-4 border-b border-gray-700 pb-3 mb-3">
+                    <img id="srvIcon" src="" class="w-16 h-16 rounded pixelated bg-gray-800 border-2 border-gray-600" alt="Icon">
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-start">
-                            <h2 id="srvHost" class="font-bold text-lg truncate text-green-400">Server Name</h2>
-                            <span class="bg-green-600 text-[10px] px-2 py-0.5 rounded text-white font-bold">ONLINE</span>
+                             <h2 id="srvHost" class="font-bold text-lg truncate text-green-400">Server Name</h2>
+                            <span id="srvStatusBadge" class="bg-green-600 text-[10px] px-2 py-0.5 rounded text-white font-bold">ONLINE</span>
                         </div>
                         <p id="srvMotd" class="text-xs text-gray-300 font-mono mt-1 break-words line-clamp-2"></p>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 mt-4">
-                    <div class="bg-gray-800 p-2 rounded text-center border border-gray-700">
+                <div class="grid grid-cols-3 gap-2 text-xs text-center">
+                    
+                    <div class="bg-gray-800 p-2 rounded border border-gray-700">
                         <span class="block text-[10px] text-gray-500 uppercase">Players</span>
                         <span class="text-white font-bold"><span id="plOnline" class="text-green-400">0</span> / <span id="plMax">0</span></span>
                     </div>
-                    <div class="bg-gray-800 p-2 rounded text-center border border-gray-700">
+                    
+                    <div class="bg-gray-800 p-2 rounded border border-gray-700">
                         <span class="block text-[10px] text-gray-500 uppercase">Version</span>
-                        <span id="srvVer" class="text-white font-bold text-xs">1.20</span>
+                        <span id="srvVer" class="text-white font-bold block mt-1">1.20</span>
                     </div>
+
+                    <div id="gamemodeBox" class="bg-gray-800 p-2 rounded border border-gray-700">
+                        <span class="block text-[10px] text-gray-500 uppercase">Gamemode</span>
+                        <span id="srvGamemode" class="text-white font-bold block mt-1 text-xs truncate">-</span>
+                    </div>
+
+                    <div class="bg-gray-800 p-2 rounded border border-gray-700 col-span-3 text-left font-mono">
+                        <span class="block text-[10px] text-gray-500 uppercase mb-1">DNS/IP Address</span>
+                        <span id="srvIP" class="text-green-400 font-bold text-xs">0.0.0.0</span>:<span id="srvPort" class="text-orange-400 font-bold text-xs">25565</span>
+                    </div>
+
                 </div>
 
-                <p id="apiSource" class="text-[10px] text-right text-gray-600 mt-2 italic">Source: -</p>
+                <p id="apiSource" class="text-[10px] text-right text-gray-600 mt-3 italic">Source: -</p>
             </div>
         </div>
     </div>
 
     <script>
         // --- KONFIGURASI ---
-        // GANTI URL INI DENGAN URL VERCEL KAMU!
+        // PASTI SUDAH DIGANTI DENGAN URL VERCEL KAMU!
         const API_URL = "https://rifqy-mc.vercel.app/api/status"; 
         
         let currentType = 'java'; // Default
@@ -106,6 +120,9 @@
                 btnJava.className = "minecraft-btn w-1/2 py-2 bg-gray-600 text-gray-300 font-bold text-sm border-2 border-gray-700 transition";
             }
         }
+        
+        // Atur default saat pertama load
+        document.addEventListener('DOMContentLoaded', () => setType('java'));
 
         async function checkStatus() {
             const input = document.getElementById('serverInput').value.trim();
@@ -121,11 +138,7 @@
             loading.classList.remove('hidden');
 
             try {
-                // Warning jika URL belum diganti
-                if(API_URL.includes("GANTI_DENGAN")) {
-                    throw new Error("URL API Vercel belum diset di script HTML!");
-                }
-
+                // Panggil API Vercel
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -142,23 +155,33 @@
                     throw new Error(data.error || "Server Offline / Tidak Ditemukan");
                 }
 
-                // Render Data
+                // --- 1. Render Data Utama ---
                 document.getElementById('srvHost').innerText = data.host || input;
-                document.getElementById('srvMotd').innerText = data.motd || "No description";
+                // Bersihkan motd dari kode warna (&c, &a, dll)
+                document.getElementById('srvMotd').innerText = (data.motd || "No description").replace(/§[0-9a-fk-or]/g, "");
+                
+                // --- 2. Detail Stat ---
                 document.getElementById('plOnline').innerText = data.players.online;
                 document.getElementById('plMax').innerText = data.players.max;
                 document.getElementById('srvVer').innerText = data.version || "Unknown";
+                document.getElementById('srvGamemode').innerText = data.gamemode || "-";
+                
+                // --- 3. DNS/IP Info ---
+                document.getElementById('srvIP').innerText = data.ip_address || data.host;
+                document.getElementById('srvPort').innerText = data.port || (currentType === 'java' ? '25565' : '19132');
+                
                 document.getElementById('apiSource').innerText = "Source: " + data.source;
 
+                // --- 4. Icon & Status Badge ---
                 const icon = document.getElementById('srvIcon');
                 if (data.icon) {
                     icon.src = data.icon;
                 } else {
-                    // Default icon based on type
-                    icon.src = currentType === 'java' 
-                        ? "https://api.mcsrvstat.us/icon/" + input 
-                        : "https://raw.githubusercontent.com/GeyserMC/Geyser/master/core/src/main/resources/pack.png";
+                    icon.src = "https://raw.githubusercontent.com/GeyserMC/Geyser/master/core/src/main/resources/pack.png"; // Default icon
                 }
+                document.getElementById('srvStatusBadge').innerText = "ONLINE";
+                document.getElementById('srvStatusBadge').className = "bg-green-600 text-[10px] px-2 py-0.5 rounded text-white font-bold";
+
 
                 resultBox.classList.remove('hidden');
 
