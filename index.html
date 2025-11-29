@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RifqyMC - Server Status</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        .mc-font { font-family: 'Press Start 2P', cursive; }
+        .body-font { font-family: 'Inter', sans-serif; }
+        .dirt-bg { background-color: #1a1a1a; background-image: url('https://www.transparenttextures.com/patterns/dark-matter.png'); }
+    </style>
+</head>
+<body class="dirt-bg text-gray-200 min-h-screen flex flex-col items-center justify-center p-4 body-font">
+
+    <div class="w-full max-w-lg bg-gray-900 border-4 border-gray-700 p-6 rounded-lg shadow-2xl">
+        
+        <div class="text-center mb-8">
+            <h1 class="mc-font text-green-500 text-2xl md:text-3xl mb-2 drop-shadow-md">RifqyMC</h1>
+            <p class="text-gray-400 text-sm">Java & Bedrock Server Checker</p>
+        </div>
+
+        <div class="flex flex-col gap-3 mb-6">
+            <label class="text-xs text-gray-400 uppercase tracking-widest">Server Address</label>
+            <div class="flex">
+                <input type="text" id="serverInput" placeholder="Contoh: NationMC.net:19132" 
+                    class="w-full bg-gray-800 border-2 border-gray-600 text-white p-3 focus:outline-none focus:border-green-500 rounded-l-md font-mono"
+                    onkeypress="handleEnter(event)">
+                <button onclick="checkServer()" 
+                    class="bg-green-600 hover:bg-green-700 text-white px-6 font-bold border-2 border-green-800 rounded-r-md transition">
+                    CEK
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 italic">Support IP:Port (Java & Bedrock)</p>
+        </div>
+
+        <div id="loading" class="hidden text-center py-4">
+            <div class="inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+            <p class="mt-2 text-sm text-green-400">Sedang menghubungi server...</p>
+        </div>
+
+        <div id="errorBox" class="hidden bg-red-900/50 border border-red-500 text-red-200 p-3 rounded text-sm text-center mb-4"></div>
+
+        <div id="resultBox" class="hidden animate-fade-in-up">
+            <div class="flex items-center justify-between bg-gray-800 p-4 rounded-t-md border-b border-gray-700">
+                <div class="flex items-center gap-3">
+                    <img id="srvIcon" src="" class="w-12 h-12 rounded hidden"> <div>
+                        <h2 id="srvHost" class="font-bold text-white text-lg">Server Name</h2>
+                        <span id="srvType" class="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded">Type</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="inline-block w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="text-green-400 font-bold ml-1">ONLINE</span>
+                    <p id="srvPing" class="text-xs text-gray-500">0 ms</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 p-4 rounded-b-md space-y-3">
+                
+                <div class="bg-black/30 p-3 rounded font-mono text-sm text-gray-300 break-words" id="srvMotd"></div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-700 p-3 rounded text-center">
+                        <p class="text-xs text-gray-400 uppercase">Players</p>
+                        <p class="text-xl font-bold text-white"><span id="plOnline">0</span> / <span id="plMax">0</span></p>
+                    </div>
+                    <div class="bg-gray-700 p-3 rounded text-center">
+                        <p class="text-xs text-gray-400 uppercase">Version</p>
+                        <p id="srvVer" class="text-sm font-bold text-white mt-1">1.20.1</p>
+                    </div>
+                </div>
+
+                <p id="apiSource" class="text-[10px] text-center text-gray-600 mt-2">Source: Primary API</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- KONFIGURASI ---
+        // Ganti dengan URL Vercel kamu nanti!
+        const MY_API_URL = "GANTI_DENGAN_URL_VERCEL_RIFQYMC_KAMU/api/status"; 
+        
+        // URL Backup (Mcsrvstat.us Public API)
+        const BACKUP_API_URL = "https://api.mcsrvstat.us/2/";
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') checkServer();
+        }
+
+        async function checkServer() {
+            const input = document.getElementById('serverInput').value.trim();
+            const resultBox = document.getElementById('resultBox');
+            const errorBox = document.getElementById('errorBox');
+            const loading = document.getElementById('loading');
+            
+            if (!input) return;
+
+            // Reset UI
+            resultBox.classList.add('hidden');
+            errorBox.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            try {
+                // 1. COBA API SENDIRI (RIFQYMC)
+                console.log("Mencoba Primary API...");
+                let response = await fetch(MY_API_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ address: input })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Primary API Failed");
+                }
+
+                let data = await response.json();
+                renderResult(data, "RifqyMC API (Primary)");
+
+            } catch (err) {
+                // 2. JIKA GAGAL, COBA API CADANGAN
+                console.warn("Primary gagal, beralih ke Cadangan...", err);
+                try {
+                    let backupResp = await fetch(BACKUP_API_URL + input);
+                    let backupData = await backupResp.json();
+
+                    if (!backupData.online) {
+                        throw new Error("Server Offline (Both APIs)");
+                    }
+
+                    // Format data backup agar sesuai format kita
+                    const formattedData = {
+                        type: "Unknown/Java", // API backup kurang spesifik soal tipe
+                        motd: backupData.motd ? (backupData.motd.clean || backupData.motd.html) : "",
+                        players: { online: backupData.players.online, max: backupData.players.max },
+                        version: backupData.version,
+                        latency: "N/A", // API backup kadang tidak kirim ping realtime
+                        icon: backupData.icon
+                    };
+                    
+                    renderResult(formattedData, "Mcsrvstat.us (Backup API)");
+
+                } catch (finalErr) {
+                    loading.classList.add('hidden');
+                    errorBox.innerHTML = `❌ <strong>Gagal!</strong><br>Server offline atau alamat salah.<br><span class="text-xs">Cek penulisan IP/Port (Contoh: play.net:19132)</span>`;
+                    errorBox.classList.remove('hidden');
+                }
+            }
+        }
+
+        function renderResult(data, sourceName) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('resultBox').classList.remove('hidden');
+
+            document.getElementById('srvHost').innerText = document.getElementById('serverInput').value;
+            document.getElementById('srvType').innerText = data.type;
+            document.getElementById('srvPing').innerText = data.latency ? data.latency + " ms" : "";
+            
+            // Handle MOTD (bisa berupa array atau string)
+            let motdText = data.motd;
+            if (Array.isArray(motdText)) motdText = motdText.join(" ");
+            // Hapus kode warna minecraft (§a, §b, dll) sederhana
+            document.getElementById('srvMotd').innerText = motdText.replace(/§[0-9a-fk-or]/g, "");
+
+            document.getElementById('plOnline').innerText = data.players.online;
+            document.getElementById('plMax').innerText = data.players.max;
+            document.getElementById('srvVer').innerText = data.version;
+            document.getElementById('apiSource').innerText = "Data fetched via: " + sourceName;
+
+            // Handle Icon
+            const iconImg = document.getElementById('srvIcon');
+            if (data.icon) {
+                iconImg.src = data.icon;
+                iconImg.classList.remove('hidden');
+            } else {
+                iconImg.classList.add('hidden'); // Default Steve/Grass block bisa dipasang disini
+            }
+        }
+    </script>
+</body>
+</html>
