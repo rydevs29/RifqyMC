@@ -1,16 +1,27 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
+import socket
 
 app = Flask(__name__)
 CORS(app)
 
-def normalize_data(source, data, server_type):
+def resolve_ip(address):
+    """Fungsi untuk mencoba mendapatkan IP address dari hostname/domain."""
+    try:
+        host = address.split(':')[0]
+        return socket.gethostbyname(host)
+    except:
+        return host # Kembalikan host jika gagal resolve
+
+def normalize_data(source, data, srv_type):
     """Fungsi untuk menyamakan format data dari berbagai API"""
     result = {
         "online": False,
         "host": "",
         "port": 0,
+        "ip_address": "", # Field baru
+        "gamemode": None, # Field baru
         "motd": "",
         "players": {"online": 0, "max": 0},
         "version": "",
@@ -23,33 +34,39 @@ def normalize_data(source, data, server_type):
             result["online"] = True
             result["host"] = data.get("hostname")
             result["port"] = data.get("port")
-            # Motd di mcsrvstat bisa berupa array html atau clean
+            result["ip_address"] = resolve_ip(result["host"]) # Resolve IP
+            
             motd_clean = data.get("motd", {}).get("clean", [])
             result["motd"] = " ".join(motd_clean) if isinstance(motd_clean, list) else str(motd_clean)
             result["players"]["online"] = data.get("players", {}).get("online", 0)
             result["players"]["max"] = data.get("players", {}).get("max", 0)
             result["version"] = data.get("version")
-            result["icon"] = data.get("icon") # Base64
+            result["icon"] = data.get("icon")
+            # Gamemode (mcsrvstat.us biasanya tidak menyediakan)
+            result["gamemode"] = data.get("gamemode")
             
     elif source == "mcstatus.io":
         if data.get("online"):
             result["online"] = True
             result["host"] = data.get("host")
             result["port"] = data.get("port")
-            # Motd di mcstatus.io
+            result["ip_address"] = data.get("ip") or resolve_ip(result["host"]) # mcstatus.io langsung kasih IP
+            
             result["motd"] = data.get("motd", {}).get("clean", "")
             result["players"]["online"] = data.get("players", {}).get("online", 0)
             result["players"]["max"] = data.get("players", {}).get("max", 0)
             result["version"] = data.get("version", {}).get("name_clean") or data.get("version", {}).get("name")
-            result["icon"] = data.get("icon") # Base64
-
+            result["icon"] = data.get("icon")
+            # Gamemode
+            result["gamemode"] = data.get("gamemode")
+            
     return result
 
 @app.route('/api/status', methods=['POST'])
 def check_server():
+    # ... (Sama seperti sebelumnya, tidak ada perubahan di sini) ...
     data = request.json
     address = data.get('address', '').strip()
-    # User memilih tipe: 'java' atau 'bedrock'
     srv_type = data.get('type', 'java').lower() 
     
     if not address:
@@ -73,7 +90,6 @@ def check_server():
 
     # --- 2. COBA BACKUP API (mcstatus.io v2) ---
     try:
-        # mcstatus.io endpoint structure
         url_backup = f"https://api.mcstatus.io/v2/status/{srv_type}/{address}"
         
         resp = requests.get(url_backup, timeout=5)
